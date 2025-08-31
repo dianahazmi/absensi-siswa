@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi Siswa</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    video, canvas { width: 80%; max-width: 400px; margin: 10px auto; display: block; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>Absensi Siswa</h2>
+
+  <label for="nama">Cari / ketik Nama:</label><br>
+  <input type="text" id="nama" placeholder="Masukkan nama siswa"><br><br>
+
+  <video id="video" autoplay></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <button id="takePhoto">📸 Ambil Foto</button>
+  <button id="sendData">✅ Kirim Absen</button>
+
+  <p id="status"></p>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const status = document.getElementById('status');
+    const ctx = canvas.getContext('2d');
+
+    // Aktifkan kamera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { console.error("Kamera tidak bisa dibuka: ", err); });
+
+    let photoData = "";
+
+    // Ambil foto dari video
+    document.getElementById('takePhoto').addEventListener('click', () => {
+      canvas.style.display = "block";
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      photoData = canvas.toDataURL("image/png"); // simpan dalam base64
+      status.innerText = "Foto berhasil diambil, siap dikirim!";
+    });
+
+    // Kirim data ke Google Apps Script
+    document.getElementById('sendData').addEventListener('click', () => {
+      let nama = document.getElementById('nama').value;
+      if (!nama || !photoData) {
+        alert("Isi nama dan ambil foto dulu!");
+        return;
+      }
+
+      fetch("URL_APPS_SCRIPT_ANDA", {
+        method: "POST",
+        body: JSON.stringify({ nama: nama, foto: photoData }),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(res => res.text())
+      .then(msg => { status.innerText = "✅ Absen berhasil dikirim!"; })
+      .catch(err => { status.innerText = "❌ Gagal mengirim absen."; });
+    });
+  </script>
+</body>
+</html>
