@@ -7,8 +7,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     body { background: #f8f9fa; }
-    .container { max-width: 600px; margin-top: 50px; }
-    .student-card { padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .container { max-width: 600px; margin-top: 40px; }
+    .student-card { padding: 20px; background: white; border-radius: 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); }
     .thumbnail { max-width: 200px; border-radius: 10px; margin-top: 10px; }
   </style>
 </head>
@@ -17,23 +17,28 @@
   <h3 class="text-center mb-3">📷 Absensi Siswa</h3>
 
   <!-- STATUS KONEKSI -->
-  <div id="statusKoneksi" class="alert alert-secondary py-2 text-center">🔄 Mengecek koneksi ke Google Sheet...</div>
+  <div id="statusKoneksi" class="alert alert-secondary py-2 text-center">
+    🔄 Mengecek koneksi ke Google Sheet...
+  </div>
 
-  <!-- Search Box -->
-  <input class="form-control" list="namaList" id="namaInput" placeholder="Cari nama Anda...">
+  <!-- Input Cari Nama -->
+  <div class="input-group mb-3">
+    <input class="form-control" list="namaList" id="namaInput" placeholder="Cari nama Anda...">
+    <button class="btn btn-primary" onclick="cariNama()">Pilih</button>
+  </div>
   <datalist id="namaList"></datalist>
-  <button class="btn btn-primary w-100 mt-3" onclick="cariNama()">Pilih Nama</button>
 
-  <!-- Student Section -->
+  <!-- Card Siswa -->
   <div id="studentSection" class="student-card mt-4 d-none"></div>
 </div>
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKdXRKhuBjRRkc8xNUQHDWB7-M7Kb_T0XQuYe_oNpiMCQCLO5mZnbCdj-t5ypIFcwkdA/exec";
+
 let allStudents = [];
 let currentStudent = null;
 
-// === CEK KONEKSI & AMBIL DATA NAMA ===
+// === CEK KONEKSI & AMBIL DATA ===
 fetch(SCRIPT_URL)
   .then(res => {
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -55,34 +60,38 @@ fetch(SCRIPT_URL)
     document.getElementById("statusKoneksi").innerText = "❌ Gagal koneksi ke Google Sheet: " + err;
   });
 
-// === FUNGSI CARI NAMA ===
+// === FUNGSI PILIH NAMA ===
 function cariNama() {
   const nama = document.getElementById("namaInput").value.trim();
   currentStudent = allStudents.find(s => s.nama.toLowerCase() === nama.toLowerCase());
 
   const section = document.getElementById("studentSection");
+  section.classList.remove("d-none");
+
   if (!currentStudent) {
-    section.classList.remove("d-none");
     section.innerHTML = `<p class="text-danger">Nama tidak ditemukan.</p>`;
     return;
   }
 
+  let badgeColor = "secondary";
+  if (currentStudent.status.includes("Menunggu")) badgeColor = "warning";
+  if (currentStudent.status.includes("Terverifikasi")) badgeColor = "success";
+
+  section.innerHTML = `
+    <h5>${currentStudent.nama}</h5>
+    <p>Status: <span class="badge bg-${badgeColor}">${currentStudent.status}</span></p>
+  `;
+
   if (currentStudent.foto) {
-    section.classList.remove("d-none");
-    section.innerHTML = `
-      <h5>${currentStudent.nama}</h5>
-      <p>Status: <span class="badge bg-${currentStudent.status.includes("Terverifikasi") ? "success" : "warning"}">${currentStudent.status}</span></p>
+    section.innerHTML += `
       <a href="${currentStudent.foto}" target="_blank">
         <img src="${currentStudent.foto}" class="thumbnail img-thumbnail">
       </a>
     `;
   } else {
-    section.classList.remove("d-none");
-    section.innerHTML = `
-      <h5>${currentStudent.nama}</h5>
-      <p>Status: <span class="badge bg-secondary">Belum Absen</span></p>
+    section.innerHTML += `
       <input type="file" id="fotoInput" accept="image/*" class="form-control mt-2">
-      <button class="btn btn-success mt-3" onclick="uploadFoto()">Kirim Foto</button>
+      <button class="btn btn-success mt-3 w-100" onclick="uploadFoto()">📤 Kirim Foto</button>
     `;
   }
 }
@@ -112,9 +121,9 @@ function uploadFoto() {
     })
     .then(res => res.text())
     .then(txt => {
-      alert("Foto berhasil dikirim! Refresh halaman untuk melihat status.");
+      alert("✅ Foto berhasil dikirim!\nSilakan refresh halaman untuk update status.");
     })
-    .catch(err => alert("Gagal upload: " + err));
+    .catch(err => alert("❌ Gagal upload: " + err));
   };
   reader.readAsDataURL(file);
 }
