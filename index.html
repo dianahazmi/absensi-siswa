@@ -2,137 +2,122 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Absensi Siswa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background: #f7faff; }
+    body { background: #f8f9fa; }
     .container { max-width: 600px; margin-top: 50px; }
-    #preview { max-width: 200px; margin-top: 15px; display: none; }
+    .student-card { padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .thumbnail { max-width: 200px; border-radius: 10px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="container card p-4 shadow">
-    <h3 class="text-center text-primary mb-3">📘 Absensi Siswa</h3>
+<div class="container">
+  <h3 class="text-center mb-3">📷 Absensi Siswa</h3>
 
-    <!-- Cari nama -->
-    <div class="mb-3">
-      <label class="form-label">Cari Nama Siswa</label>
-      <input type="text" class="form-control" id="nama" placeholder="Ketik nama...">
-      <div id="listNama" class="list-group mt-2"></div>
-    </div>
+  <!-- STATUS KONEKSI -->
+  <div id="statusKoneksi" class="alert alert-secondary py-2 text-center">🔄 Mengecek koneksi ke Google Sheet...</div>
 
-    <!-- Upload Foto -->
-    <div id="uploadSection" style="display:none;">
-      <label class="form-label">Lampirkan Foto</label>
-      <input type="file" class="form-control" id="fotoInput" accept="image/*">
-      <img id="preview" class="img-thumbnail">
-      <button class="btn btn-success mt-3" id="kirimBtn">✅ Kirim Absen</button>
-    </div>
+  <!-- Search Box -->
+  <input class="form-control" list="namaList" id="namaInput" placeholder="Cari nama Anda...">
+  <datalist id="namaList"></datalist>
+  <button class="btn btn-primary w-100 mt-3" onclick="cariNama()">Pilih Nama</button>
 
-    <!-- Status -->
-    <div id="statusSection" style="display:none;">
-      <h5>Status Absensi:</h5>
-      <p id="statusText" class="fw-bold"></p>
-      <img id="statusFoto" class="img-thumbnail" style="max-width:200px;">
-    </div>
-  </div>
+  <!-- Student Section -->
+  <div id="studentSection" class="student-card mt-4 d-none"></div>
+</div>
 
 <script>
-const scriptURL = "https://script.google.com/macros/s/AKfycbwKdXRKhuBjRRkc8xNUQHDWB7-M7Kb_T0XQuYe_oNpiMCQCLO5mZnbCdj-t5ypIFcwkdA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKdXRKhuBjRRkc8xNUQHDWB7-M7Kb_T0XQuYe_oNpiMCQCLO5mZnbCdj-t5ypIFcwkdA/exec";
+let allStudents = [];
+let currentStudent = null;
 
-// === Step 1: Ambil daftar siswa dari Google Sheet ===
-async function getSiswaList() {
-  const res = await fetch(scriptURL + "?action=getSiswa");
-  return res.json();
-}
-
-let siswaData = [];
-let selectedSiswa = null;
-
-document.addEventListener("DOMContentLoaded", async () => {
-  siswaData = await getSiswaList();
-
-  const inputNama = document.getElementById("nama");
-  const listNama = document.getElementById("listNama");
-
-  inputNama.addEventListener("input", () => {
-    let keyword = inputNama.value.toLowerCase();
-    listNama.innerHTML = "";
-    if (keyword.length < 2) return;
-
-    let hasil = siswaData.filter(s => s.nama.toLowerCase().includes(keyword));
-    hasil.forEach(s => {
-      let item = document.createElement("button");
-      item.className = "list-group-item list-group-item-action";
-      item.innerText = s.nama;
-      item.onclick = () => pilihSiswa(s);
-      listNama.appendChild(item);
+// === CEK KONEKSI & AMBIL DATA NAMA ===
+fetch(SCRIPT_URL)
+  .then(res => {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  })
+  .then(data => {
+    allStudents = data;
+    let list = document.getElementById("namaList");
+    data.forEach(s => {
+      let opt = document.createElement("option");
+      opt.value = s.nama;
+      list.appendChild(opt);
     });
+    document.getElementById("statusKoneksi").className = "alert alert-success py-2 text-center";
+    document.getElementById("statusKoneksi").innerText = "✅ Tersambung ke Google Sheet (" + data.length + " siswa)";
+  })
+  .catch(err => {
+    document.getElementById("statusKoneksi").className = "alert alert-danger py-2 text-center";
+    document.getElementById("statusKoneksi").innerText = "❌ Gagal koneksi ke Google Sheet: " + err;
   });
-});
 
-function pilihSiswa(s) {
-  selectedSiswa = s;
-  document.getElementById("nama").value = s.nama;
-  document.getElementById("listNama").innerHTML = "";
+// === FUNGSI CARI NAMA ===
+function cariNama() {
+  const nama = document.getElementById("namaInput").value.trim();
+  currentStudent = allStudents.find(s => s.nama.toLowerCase() === nama.toLowerCase());
 
-  if (s.foto) {
-    // Sudah pernah upload
-    document.getElementById("statusSection").style.display = "block";
-    document.getElementById("uploadSection").style.display = "none";
-    document.getElementById("statusText").innerText = s.status || "Menunggu Verifikasi";
-    document.getElementById("statusFoto").src = s.foto;
+  const section = document.getElementById("studentSection");
+  if (!currentStudent) {
+    section.classList.remove("d-none");
+    section.innerHTML = `<p class="text-danger">Nama tidak ditemukan.</p>`;
+    return;
+  }
+
+  if (currentStudent.foto) {
+    section.classList.remove("d-none");
+    section.innerHTML = `
+      <h5>${currentStudent.nama}</h5>
+      <p>Status: <span class="badge bg-${currentStudent.status.includes("Terverifikasi") ? "success" : "warning"}">${currentStudent.status}</span></p>
+      <a href="${currentStudent.foto}" target="_blank">
+        <img src="${currentStudent.foto}" class="thumbnail img-thumbnail">
+      </a>
+    `;
   } else {
-    // Belum upload
-    document.getElementById("uploadSection").style.display = "block";
-    document.getElementById("statusSection").style.display = "none";
+    section.classList.remove("d-none");
+    section.innerHTML = `
+      <h5>${currentStudent.nama}</h5>
+      <p>Status: <span class="badge bg-secondary">Belum Absen</span></p>
+      <input type="file" id="fotoInput" accept="image/*" class="form-control mt-2">
+      <button class="btn btn-success mt-3" onclick="uploadFoto()">Kirim Foto</button>
+    `;
   }
 }
 
-// === Step 2: Preview sebelum upload ===
-document.getElementById("fotoInput").addEventListener("change", function(e) {
-  let file = e.target.files[0];
-  if (!file) return;
+// === UPLOAD FOTO ===
+function uploadFoto() {
+  const fileInput = document.getElementById("fotoInput");
+  if (!fileInput.files.length) {
+    alert("Pilih foto terlebih dahulu!");
+    return;
+  }
+  const file = fileInput.files[0];
+  if (file.size > 1024 * 1024) {
+    alert("Ukuran foto maksimal 1MB");
+    return;
+  }
 
-  let reader = new FileReader();
-  reader.onload = function(ev) {
-    document.getElementById("preview").style.display = "block";
-    document.getElementById("preview").src = ev.target.result;
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        nama: currentStudent.nama,
+        foto: reader.result
+      }),
+      headers: { "Content-Type": "application/json" }
+    })
+    .then(res => res.text())
+    .then(txt => {
+      alert("Foto berhasil dikirim! Refresh halaman untuk melihat status.");
+    })
+    .catch(err => alert("Gagal upload: " + err));
   };
   reader.readAsDataURL(file);
-});
-
-// === Step 3: Kirim ke Apps Script ===
-document.getElementById("kirimBtn").addEventListener("click", async () => {
-  if (!selectedSiswa) { alert("Pilih nama dulu!"); return; }
-  let fileInput = document.getElementById("fotoInput").files[0];
-  if (!fileInput) { alert("Pilih foto dulu!"); return; }
-
-  let reader = new FileReader();
-  reader.onload = async function(ev) {
-    let base64 = ev.target.result;
-
-    let data = { 
-      action: "uploadFoto",
-      nama: selectedSiswa.nama,
-      foto: base64 
-    };
-
-    let res = await fetch(scriptURL, {
-      method: "POST",
-      body: JSON.stringify(data)
-    });
-    let msg = await res.text();
-    alert("✅ " + msg);
-
-    // Refresh tampilan
-    selectedSiswa.foto = base64;
-    selectedSiswa.status = "Menunggu Verifikasi";
-    pilihSiswa(selectedSiswa);
-  };
-  reader.readAsDataURL(fileInput);
-});
+}
 </script>
 </body>
 </html>
