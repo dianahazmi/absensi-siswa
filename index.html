@@ -2,122 +2,99 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Absensi Foto Siswa</title>
+  <title>Absensi Siswa (CSV Edition)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    .card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; }
-    .hidden { display: none; }
-    img { max-width: 150px; margin-top: 10px; border-radius: 8px; }
-    button { padding: 8px 15px; margin-top: 10px; cursor: pointer; }
+    body { background: #f8f9fa; }
+    .container { max-width: 600px; margin-top: 40px; }
+    .student-card { padding: 20px; background: white; border-radius: 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); }
+    .thumbnail { max-width: 200px; border-radius: 10px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h2>Absensi Foto Siswa</h2>
+<div class="container">
+  <h3 class="text-center mb-3">📷 Absensi Siswa (CSV)</h3>
 
-  <label>Cari Nama Siswa:</label><br>
-  <input type="text" id="searchBox" placeholder="Ketik nama..." />
-  <div id="suggestions"></div>
-
-  <div id="formArea" class="hidden">
-    <h3 id="selectedName"></h3>
-    <div id="statusArea"></div>
-    <div id="uploadArea" class="hidden">
-      <input type="file" id="fileInput" accept="image/*"><br>
-      <button onclick="uploadFoto()">Upload Foto</button>
-    </div>
-    <div id="previewArea"></div>
+  <div id="statusKoneksi" class="alert alert-secondary py-2 text-center">
+    🔄 Mengecek koneksi ke CSV publik...
   </div>
 
-  <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKdXRKhuBjRRkc8xNUQHDWB7-M7Kb_T0XQuYe_oNpiMCQCLO5mZnbCdj-t5ypIFcwkdA/exec";
-    let allData = [];
-    let selectedNama = "";
+  <div class="input-group mb-3">
+    <input class="form-control" list="namaList" id="namaInput" placeholder="Cari nama siswa...">
+    <button class="btn btn-primary" onclick="cariNama()">Pilih</button>
+  </div>
+  <datalist id="namaList"></datalist>
+  <div id="studentSection" class="student-card mt-4 d-none"></div>
+</div>
 
-    // Ambil data dari Google Sheet
-    async function loadData() {
-      try {
-        let res = await fetch(SCRIPT_URL);
-        let json = await res.json();
-        if (json.status === "success") {
-          allData = json.data;
-        } else {
-          alert("❌ Gagal ambil data: " + json.message);
-        }
-      } catch (err) {
-        alert("❌ Error koneksi: " + err.message);
-      }
-    }
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ34iHsZU_lS2ZEv2YVCbHRx1MdoJWg0y5rfJKQ_hiXgAGkoZwQlLHT78kvuZnT0e8beckdTjPBvkuR/pub?gid=0&single=true&output=csv";
+let allStudents = [];
+let currentStudent = null;
 
-    // Autocomplete pencarian
-    document.getElementById("searchBox").addEventListener("input", function () {
-      let keyword = this.value.toLowerCase();
-      let matches = allData.filter(s => s.nama.toLowerCase().includes(keyword));
-      let html = matches.map(m => `<div onclick="selectNama('${m.nama}')">${m.nama}</div>`).join("");
-      document.getElementById("suggestions").innerHTML = html;
+// Load CSV via fetch, parse, then populate list
+fetch(CSV_URL)
+  .then(res => {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.text();
+  })
+  .then(csvText => {
+    // Parse CSV to array
+    const lines = csvText.trim().split("\n");
+    const headers = lines.shift().split(",");
+    allStudents = lines.map(line => {
+      const values = line.split(",");
+      return {
+        nama: values[0],
+        status: values[1] || "Belum Absen",
+        foto: values[2] || ""
+      };
     });
 
-    // Saat nama dipilih
-    function selectNama(nama) {
-      selectedNama = nama;
-      let siswa = allData.find(s => s.nama === nama);
-      document.getElementById("suggestions").innerHTML = "";
-      document.getElementById("formArea").classList.remove("hidden");
-      document.getElementById("selectedName").innerText = "Nama: " + nama;
-      updateStatus(siswa);
-    }
+    const list = document.getElementById("namaList");
+    allStudents.forEach(s => {
+      let opt = document.createElement("option");
+      opt.value = s.nama;
+      list.appendChild(opt);
+    });
 
-    // Update tampilan status & upload
-    function updateStatus(siswa) {
-      let statusArea = document.getElementById("statusArea");
-      let uploadArea = document.getElementById("uploadArea");
-      let previewArea = document.getElementById("previewArea");
+    document.getElementById("statusKoneksi").className = "alert alert-success py-2 text-center";
+    document.getElementById("statusKoneksi").innerText = "✅ Tersambung ke CSV publik (" + allStudents.length + " siswa)";
+  })
+  .catch(err => {
+    document.getElementById("statusKoneksi").className = "alert alert-danger py-2 text-center";
+    document.getElementById("statusKoneksi").innerText = "❌ Gagal memuat CSV: " + err;
+  });
 
-      statusArea.innerHTML = "<b>Status:</b> " + siswa.status;
+function cariNama() {
+  const nama = document.getElementById("namaInput").value.trim();
+  currentStudent = allStudents.find(s => s.nama.toLowerCase() === nama.toLowerCase());
+  const section = document.getElementById("studentSection");
+  section.classList.remove("d-none");
 
-      if (siswa.foto) {
-        previewArea.innerHTML = `<img src="${siswa.foto}" alt="Foto"><br>`;
-        uploadArea.classList.add("hidden");
-      } else {
-        previewArea.innerHTML = "";
-        uploadArea.classList.remove("hidden");
-      }
-    }
+  if (!currentStudent) {
+    section.innerHTML = `<p class="text-danger">Nama tidak ditemukan.</p>`;
+    return;
+  }
 
-    // Upload foto ke Apps Script
-    async function uploadFoto() {
-      let file = document.getElementById("fileInput").files[0];
-      if (!file) return alert("Pilih foto dulu!");
+  let color = currentStudent.status.includes("Terverifikasi") ? "success" 
+             : currentStudent.status.includes("Menunggu") ? "warning" 
+             : "secondary";
 
-      let reader = new FileReader();
-      reader.onload = async function (e) {
-        let base64 = e.target.result;
-        let body = { nama: selectedNama, foto: base64 };
-
-        try {
-          let res = await fetch(SCRIPT_URL, {
-            method: "POST",
-            body: JSON.stringify(body)
-          });
-          let json = await res.json();
-          if (json.status === "success") {
-            alert("✅ Upload berhasil!");
-            // update data lokal biar langsung kelihatan
-            let siswa = allData.find(s => s.nama === selectedNama);
-            siswa.status = "Menunggu Verifikasi";
-            siswa.foto = json.url;
-            updateStatus(siswa);
-          } else {
-            alert("❌ Upload gagal: " + json.message);
-          }
-        } catch (err) {
-          alert("❌ Error: " + err.message);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-
-    // Jalankan pertama kali
-    loadData();
-  </script>
+  section.innerHTML = `
+    <h5>${currentStudent.nama}</h5>
+    <p>Status: <span class="badge bg-${color}">${currentStudent.status}</span></p>
+  `;
+  if (currentStudent.foto) {
+    section.innerHTML += `
+      <a href="${currentStudent.foto}" target="_blank">
+        <img src="${currentStudent.foto}" class="thumbnail img-thumbnail">
+      </a>`;
+  } else {
+    section.innerHTML += `<p><em>Belum ada foto.</em></p>`;
+  }
+}
+</script>
 </body>
 </html>
